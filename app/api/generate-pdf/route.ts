@@ -1,25 +1,68 @@
-import { type NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
-import { format } from "date-fns"
+import { type NextRequest, NextResponse } from "next/server";
+import { format } from "date-fns";
+import puppeteer from "puppeteer-core"; // Use puppeteer-core
+import chromium from "@sparticuz/chromium"; // Import the chromium package for Vercel
+import { Console } from "console";
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json()
-    const { healthData, dateRange, sectionVisibility } = data
+    console.log('=== API ROUTE START ===');
+    const data = await request.json();
+    console.log('Received data:', JSON.stringify(data, null, 2));
+    
+    const { healthData, dateRange, sectionVisibility } = data;
+    console.log('Parsed data:', { 
+      hasHealthData: !!healthData, 
+      dateRange, 
+      hasSectionVisibility: !!sectionVisibility 
+    });
 
     // Generate HTML content
-    const htmlContent = generateHTMLReport(healthData, dateRange, sectionVisibility)
+    const htmlContent = generateHTMLReport(healthData, dateRange, sectionVisibility);
+    console.log('Generated HTML content length:', htmlContent.length);
 
-    // Launch Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    })
+    try {
+      // Direct console output with timestamps
+      console.log('=== DEBUG START ===');
+      console.log('Current time:', new Date().toISOString());
+      console.log('NODE_ENV:', process.env.NODE_ENV);
+      console.log('=== DEBUG END ===');
+    } catch (logError) {
+      console.error('Failed to log debug info:', logError);
+    }
 
-    const page = await browser.newPage()
+    let browser;
+
+    // Determine if running on Vercel or locally
+    // Check if running in production environment
+    console.log(process.env.NODE_ENV);
+    const isVercel = process.env.NODE_ENV === 'production';
+
+    if (isVercel) {
+      // Configuration for Vercel deployment
+      browser = await puppeteer.launch({
+        args: [...chromium.args, "--hide-scrollbars", "--disable-web-security"],
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(
+          `https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar`
+        ),
+        headless: chromium.headless,
+        // ignoreHTTPSErrors: true,
+      });
+    } else {
+      // Configuration for local development
+      // Puppeteer will automatically find a local Chromium installation or download one.
+      browser = await puppeteer.launch({
+        headless: true, // Use headless mode for local testing
+        args: ["--no-sandbox", "--disable-setuid-sandbox"], // Standard args for local
+        // executablePath is omitted here, allowing Puppeteer to use its default behavior
+      });
+    }
+
+    const page = await browser.newPage();
 
     // Set content and wait for it to load
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" })
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
     // Generate PDF with specific options for better formatting
     const pdfBuffer = await page.pdf({
@@ -39,15 +82,15 @@ export async function POST(request: NextRequest) {
       `,
       footerTemplate: `
         <div style="font-size: 10px; width: 100%; text-align: center; color: #666;">
-          <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> | Generated on ${format(new Date(), "MMMM d, yyyy h:mm a")}</span>
+          <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> | Generated on ${format(new Date(), "MMMM d,PPPP 'at' h:mm a")}</span>
         </div>
       `,
-    })
+    });
 
-    await browser.close()
+    await browser.close();
 
     // Create filename
-    const fileName = `health-summary-${healthData.patientName.replace(/\s+/g, "-")}-${format(new Date(dateRange.from), "yyyy-MM-dd")}-to-${format(new Date(dateRange.to), "yyyy-MM-dd")}.pdf`
+    const fileName = `health-summary-${healthData.patientName.replace(/\s+/g, "-")}-${format(new Date(dateRange.from), "yyyy-MM-dd")}-to-${format(new Date(dateRange.to), "yyyy-MM-dd")}.pdf`;
 
     // Return PDF as response
     return new NextResponse(pdfBuffer, {
@@ -57,13 +100,17 @@ export async function POST(request: NextRequest) {
         "Content-Disposition": `attachment; filename="${fileName}"`,
         "Content-Length": pdfBuffer.length.toString(),
       },
-    })
-  } catch (error) {
-    console.error("Error generating PDF:", error)
-    return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 })
+    });
+  } catch (error: any) { // Explicitly type error for better access to properties
+    console.error("Error generating PDF:", error.message || error); // Log the error message or full error
+    if (error.stack) {
+      console.error("Error stack trace:", error.stack); // Log stack trace if available
+    }
+    return NextResponse.json({ error: "Failed to generate PDF", details: error.message || "Unknown error" }, { status: 500 });
   }
 }
 
+// Re-including your helper function as it's part of the route handler
 function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: any) {
   const styles = `
     <style>
@@ -312,7 +359,7 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
         }
       }
     </style>
-  `
+  `;
 
   // Generate patient info section
   const patientInfoSection = sectionVisibility?.patientInfo
@@ -361,7 +408,7 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
       </div>
     </div>
   `
-    : ""
+    : "";
 
   // Generate vitals summary
   const vitalsSection = sectionVisibility?.vitalsChart
@@ -386,7 +433,7 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
               if (!day.data?.vitalsHistory?.length) {
                 return `
                 <tr>
-                  <td>${format(new Date(day.date), "MMM d, yyyy")}</td>
+                  <td>${format(new Date(day.date), "MMM d,PPPP")}</td>
                   <td>—</td>
                   <td>—</td>
                   <td>—</td>
@@ -394,13 +441,13 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
                   <td>—</td>
                   <td>—</td>
                 </tr>
-              `
+              `;
               }
 
               return day.data.vitalsHistory
                 .map((vital: any) => `
                 <tr>
-                  <td>${format(new Date(day.date), "MMM d, yyyy")}</td>
+                  <td>${format(new Date(day.date), "MMM d,PPPP")}</td>
                   <td>${vital.time || "—"}</td>
                   <td>${vital.bloodPressure || "—"}</td>
                   <td>${vital.heartRate ? `${vital.heartRate} bpm` : "—"}</td>
@@ -409,14 +456,14 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
                   <td>${vital.bloodSugar ? `${vital.bloodSugar} mg/dL` : "—"}</td>
                 </tr>
               `)
-                .join("")
+                .join("");
             })
             .join("")}
         </tbody>
       </table>
     </div>
   `
-    : ""
+    : "";
 
   // Generate vitals alerts section
   const vitalsAlertsSection = sectionVisibility?.vitalsAlerts
@@ -426,7 +473,7 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
       ${generateVitalsAlerts(healthData.data)}
     </div>
   `
-    : ""
+    : "";
 
   // Generate diet summary
   const dietSection = sectionVisibility?.dietSummary
@@ -450,24 +497,25 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
               if (!day.data?.diet) {
                 return `
                 <tr>
-                  <td>${format(new Date(day.date), "MMM d, yyyy")}</td>
+                  <td>${format(new Date(day.date), "MMM d,PPPP")}</td>
+                  <td>—</td>
                   <td>—</td>
                   <td>—</td>
                   <td>—</td>
                   <td>—</td>
                   <td>—</td>
                 </tr>
-              `
+              `;
               }
 
-              const diet = day.data.diet
-              const total = Object.keys(diet).length
-              const completed = Object.values(diet).filter(Boolean).length
-              const percentage = Math.round((completed / total) * 100)
+              const diet = day.data.diet;
+              const total = Object.keys(diet).length;
+              const completed = Object.values(diet).filter(Boolean).length;
+              const percentage = Math.round((completed / total) * 100);
 
               return `
               <tr>
-                <td>${format(new Date(day.date), "MMM d, yyyy")}</td>
+                <td>${format(new Date(day.date), "MMM d,PPPP")}</td>
                 <td>${diet.breakfast ? "✓" : "✗"}</td>
                 <td>${diet.lunch ? "✓" : "✗"}</td>
                 <td>${diet.dinner ? "✓" : "✗"}</td>
@@ -478,14 +526,14 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
                   </span>
                 </td>
               </tr>
-            `
+            `;
             })
             .join("")}
         </tbody>
       </table>
     </div>
   `
-    : ""
+    : "";
 
   // Generate mood summary
   const moodSection = sectionVisibility?.moodChart
@@ -502,10 +550,10 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
         <tbody>
           ${healthData.data
             .map((day: any) => {
-              const moods = day.data?.moodHistory || []
+              const moods = day.data?.moodHistory || [];
               return `
               <tr>
-                <td>${format(new Date(day.date), "MMM d, yyyy")}</td>
+                <td>${format(new Date(day.date), "MMM d,PPPP")}</td>
                 <td>
                   ${
                     moods.length > 0
@@ -523,14 +571,14 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
                   }
                 </td>
               </tr>
-            `
+            `;
             })
             .join("")}
         </tbody>
       </table>
     </div>
   `
-    : ""
+    : "";
 
   // Generate activities summary
   const activitiesSection = sectionVisibility?.detailedData
@@ -547,10 +595,10 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
         <tbody>
           ${healthData.data
             .map((day: any) => {
-              const activities = day.data?.activities || []
+              const activities = day.data?.activities || [];
               return `
               <tr>
-                <td>${format(new Date(day.date), "MMM d, yyyy")}</td>
+                <td>${format(new Date(day.date), "MMM d,PPPP")}</td>
                 <td>
                   ${
                     activities.length > 0
@@ -569,14 +617,14 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
                   }
                 </td>
               </tr>
-            `
+            `;
             })
             .join("")}
         </tbody>
       </table>
     </div>
   `
-    : ""
+    : "";
 
   return `
     <!DOCTYPE html>
@@ -592,7 +640,7 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
         <div class="header">
           <h1>Health Summary Report</h1>
           <div class="subtitle">
-            ${format(new Date(dateRange.from), "MMMM d, yyyy")} - ${format(new Date(dateRange.to), "MMMM d, yyyy")}
+            ${format(new Date(dateRange.from), "MMMM d,PPPP")} - ${format(new Date(dateRange.to), "MMMM d,PPPP")}
           </div>
         </div>
         
@@ -605,7 +653,7 @@ function generateHTMLReport(healthData: any, dateRange: any, sectionVisibility: 
       </div>
     </body>
     </html>
-  `
+  `;
 }
 
 function generateVitalsAlerts(data: any[]) {
@@ -616,17 +664,17 @@ function generateVitalsAlerts(data: any[]) {
     oxygenLevel: { min: 95, max: 100 },
     bloodSugar: { min: 70, max: 140 },
     heartRate: { min: 60, max: 100 },
-  }
+  };
 
-  const alerts: any[] = []
+  const alerts: any[] = [];
 
   data.forEach((day) => {
-    if (!day.data?.vitalsHistory) return
+    if (!day.data?.vitalsHistory) return;
 
     day.data.vitalsHistory.forEach((entry: any) => {
       // Check blood pressure
       if (entry.bloodPressure) {
-        const [systolic, diastolic] = entry.bloodPressure.split("/").map(Number)
+        const [systolic, diastolic] = entry.bloodPressure.split("/").map(Number);
         if (systolic && (systolic > vitalRanges.systolic.max || systolic < vitalRanges.systolic.min)) {
           alerts.push({
             date: day.date,
@@ -635,7 +683,7 @@ function generateVitalsAlerts(data: any[]) {
             value: `${systolic} mmHg`,
             status: systolic > vitalRanges.systolic.max ? "High" : "Low",
             severity: systolic > 160 || systolic < 80 ? "Critical" : "Warning",
-          })
+          });
         }
         if (diastolic && (diastolic > vitalRanges.diastolic.max || diastolic < vitalRanges.diastolic.min)) {
           alerts.push({
@@ -645,13 +693,31 @@ function generateVitalsAlerts(data: any[]) {
             value: `${diastolic} mmHg`,
             status: diastolic > vitalRanges.diastolic.max ? "High" : "Low",
             severity: diastolic > 100 || diastolic < 50 ? "Critical" : "Warning",
-          })
+          });
         }
       }
 
-      // Check other vitals...
+      // Check heart rate
+      if (entry.heartRate) {
+        const heartRate = Number.parseFloat(entry.heartRate);
+        if (
+          !isNaN(heartRate) &&
+          (heartRate > vitalRanges.heartRate.max || heartRate < vitalRanges.heartRate.min)
+        ) {
+          alerts.push({
+            date: day.date,
+            time: entry.time,
+            type: "Heart Rate",
+            value: `${heartRate} bpm`,
+            status: heartRate > vitalRanges.heartRate.max ? "High" : "Low",
+            severity: heartRate > 120 || heartRate < 40 ? "Critical" : "Warning", // Example critical values
+          });
+        }
+      }
+
+      // Check temperature
       if (entry.temperature) {
-        const temperature = Number.parseFloat(entry.temperature)
+        const temperature = Number.parseFloat(entry.temperature);
         if (
           !isNaN(temperature) &&
           (temperature > vitalRanges.temperature.max || temperature < vitalRanges.temperature.min)
@@ -663,16 +729,50 @@ function generateVitalsAlerts(data: any[]) {
             value: `${temperature}°F`,
             status: temperature > vitalRanges.temperature.max ? "High" : "Low",
             severity: temperature > 101 || temperature < 96 ? "Critical" : "Warning",
-          })
+          });
         }
       }
 
-      // Add other vital checks...
-    })
-  })
+      // Check oxygen level
+      if (entry.oxygenLevel) {
+        const oxygenLevel = Number.parseFloat(entry.oxygenLevel);
+        if (
+          !isNaN(oxygenLevel) &&
+          (oxygenLevel > vitalRanges.oxygenLevel.max || oxygenLevel < vitalRanges.oxygenLevel.min)
+        ) {
+          alerts.push({
+            date: day.date,
+            time: entry.time,
+            type: "Oxygen Level",
+            value: `${oxygenLevel}%`,
+            status: oxygenLevel > vitalRanges.oxygenLevel.max ? "High" : "Low",
+            severity: oxygenLevel < 90 ? "Critical" : "Warning", // Example critical value
+          });
+        }
+      }
+
+      // Check blood sugar
+      if (entry.bloodSugar) {
+        const bloodSugar = Number.parseFloat(entry.bloodSugar);
+        if (
+          !isNaN(bloodSugar) &&
+          (bloodSugar > vitalRanges.bloodSugar.max || bloodSugar < vitalRanges.bloodSugar.min)
+        ) {
+          alerts.push({
+            date: day.date,
+            time: entry.time,
+            type: "Blood Sugar",
+            value: `${bloodSugar} mg/dL`,
+            status: bloodSugar > vitalRanges.bloodSugar.max ? "High" : "Low",
+            severity: bloodSugar > 200 || bloodSugar < 50 ? "Critical" : "Warning", // Example critical values
+          });
+        }
+      }
+    });
+  });
 
   if (alerts.length === 0) {
-    return "<p>No vital sign alerts detected in the selected period.</p>"
+    return "<p>No vital sign alerts detected in the selected period.</p>";
   }
 
   return `
@@ -683,7 +783,7 @@ function generateVitalsAlerts(data: any[]) {
         <div class="vitals-alert ${alert.severity === "Critical" ? "" : "warning"}">
           <div class="alert-text">
             <strong>${alert.type} - ${alert.status}</strong><br>
-            ${format(new Date(alert.date), "MMM d, yyyy")} at ${alert.time} - Value: ${alert.value}
+            ${format(new Date(alert.date), "MMM d,PPPP")} at ${alert.time} - Value: ${alert.value}
             <span class="badge ${alert.severity === "Critical" ? "badge-error" : "badge-warning"}">${alert.severity}</span>
           </div>
         </div>
@@ -691,5 +791,24 @@ function generateVitalsAlerts(data: any[]) {
         )
         .join("")}
     </div>
-  `
+  `;
 }
+
+const testData = {
+  healthData: {
+    patientName: "Test Patient",
+    data: []
+  },
+  dateRange: {
+    from: new Date(),
+    to: new Date()
+  },
+  sectionVisibility: {
+    patientInfo: true,
+    vitalsChart: true,
+    vitalsAlerts: true,
+    dietSummary: true,
+    moodChart: true,
+    detailedData: true
+  }
+};

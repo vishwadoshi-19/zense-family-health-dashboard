@@ -37,6 +37,8 @@ export function Dashboard({ userId }: { userId: string }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { toast } = useToast()
 
+  
+
   const [sectionVisibility, setSectionVisibility] = useState<SectionVisibilityType>({
     patientInfo: true,
     vitalsChart: true,
@@ -122,6 +124,7 @@ export function Dashboard({ userId }: { userId: string }) {
         const data = await fetchHealthData(userId, formattedStartDate, formattedEndDate)
         setHealthData(data)
         setIsUsingMockData(false)
+        console.log("hd : " ,healthData);
       } catch (error) {
         console.error("Error fetching health data:", error)
         setError(error instanceof Error ? error.message : "Unknown error occurred")
@@ -134,6 +137,7 @@ export function Dashboard({ userId }: { userId: string }) {
           const mockData = await getMockHealthData(userId, formattedStartDate, formattedEndDate)
           setHealthData(mockData)
           setIsUsingMockData(true)
+          console.log("hd2 : " , healthData)
 
           toast({
             title: "🎭 Using Demo Data",
@@ -222,9 +226,10 @@ export function Dashboard({ userId }: { userId: string }) {
 
   const MobileActions = () => (
     <div className="flex flex-col gap-3 p-4">
-      <Button
+      {/* <Button
         onClick={handleDownloadPDF}
         disabled={isGeneratingPDF || isLoading || !healthData}
+        // disabled
         className="w-full bg-teal-700 hover:bg-teal-800 text-white"
       >
         {isGeneratingPDF ? (
@@ -237,7 +242,7 @@ export function Dashboard({ userId }: { userId: string }) {
             <Download className="h-4 w-4 mr-2" />📄 Download Summary
           </>
         )}
-      </Button>
+      </Button> */}
       <Button
         variant="outline"
         onClick={handleLogout}
@@ -269,9 +274,10 @@ export function Dashboard({ userId }: { userId: string }) {
 
             {/* Desktop Actions */}
             <div className="hidden md:flex gap-2">
-              <Button
+              {/* <Button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF || isLoading || !healthData}
+                // disabled
                 className="bg-teal-700 hover:bg-teal-800 text-white"
               >
                 {isGeneratingPDF ? (
@@ -284,7 +290,7 @@ export function Dashboard({ userId }: { userId: string }) {
                     <Download className="h-4 w-4 mr-2" />📄 Download
                   </>
                 )}
-              </Button>
+              </Button> */}
               <Button
                 variant="outline"
                 onClick={handleLogout}
@@ -307,9 +313,10 @@ export function Dashboard({ userId }: { userId: string }) {
       </header>
 
       {/* Floating Download Button for Mobile */}
-      <Button
+      {/* <Button
         onClick={handleDownloadPDF}
         disabled={isGeneratingPDF || isLoading || !healthData}
+        // disabled
         className="fixed bottom-6 right-6 md:hidden w-16 h-16 rounded-full bg-teal-700 hover:bg-teal-800 text-white shadow-lg z-50"
       >
         {isGeneratingPDF ? (
@@ -317,7 +324,7 @@ export function Dashboard({ userId }: { userId: string }) {
         ) : (
           <Download className="h-20 w-20 text-6xl"/>
         )}
-      </Button>
+      </Button> */}
 
       <main className="container mx-auto py-4 md:py-6 px-4 md:px-6 mobile-safe-area">
         {isLoading ? (

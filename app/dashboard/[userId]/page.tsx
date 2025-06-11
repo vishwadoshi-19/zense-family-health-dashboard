@@ -3,8 +3,8 @@ import { Dashboard } from "@/components/dashboard"
 import { DashboardSkeleton } from "@/components/dashboard-skeleton"
 import { PinProtected } from "@/components/pin-protected"
 
-export default function DashboardPage({ params }: { params: { userId: string } }) {
-  const { userId } = params
+export default async function DashboardPage({ params }: { params: { userId: string } }) {
+  const { userId } = await params
 
   return (
     <PinProtected>
