@@ -3,113 +3,82 @@ import bodyParser from "body-parser";
 import { onRequest } from "firebase-functions/v2/https";
 import puppeteer from "puppeteer-core";
 import chrome from "chrome-aws-lambda";
+import cors from "cors";
 import { format } from "date-fns";
 
-import cors from "cors";
+import generateHTMLReport from "./generateHTMLReport"; // <- move the large helper here
 
-// Initialize Express app with CORS
-// and body parser for JSON requests
-// Set a reasonable limit for the request body size
-// to prevent abuse and ensure performance
-// Use a limit that balances performance and functionality
 const app = express();
 app.use(cors({ origin: true }));
-
 app.use(bodyParser.json({ limit: "10mb" }));
 
-app.post("/generate", async (req: Request, res: Response): Promise<void> => {
+app.post("/generate", async (req: Request, res: Response) => {
   try {
     const { healthData, dateRange, sectionVisibility } = req.body;
 
-    console.log("▶️ /generate called");
+    console.log("📩 Received /generate POST");
     console.log(
-      "📦 healthData keys:",
-      healthData ? Object.keys(healthData) : "undefined"
+      "🧾 healthData keys:",
+      healthData ? Object.keys(healthData) : "N/A"
     );
-    console.log("📅 dateRange:", dateRange);
-    console.log("🔍 sectionVisibility:", sectionVisibility);
 
-    // Fallback if healthData is missing or invalid
-    if (!healthData || !Array.isArray(healthData.data)) {
-      console.warn(
-        "⚠️ Missing or invalid healthData. Returning placeholder PDF."
-      );
-      const fallbackHtml = "<h1>Invalid or empty report data</h1>";
-
-      const browser = await puppeteer.launch({
-        args: chrome.args,
-        executablePath: (await chrome.executablePath) || undefined,
-        headless: true,
-      });
-
-      const page = await browser.newPage();
-      await page.setContent(fallbackHtml, { waitUntil: "networkidle0" });
-      const fallbackPDF = await page.pdf({
-        format: "a4",
-        printBackground: true,
-      });
-      await browser.close();
-
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        "attachment; filename=invalid-report.pdf"
-      );
-      res.send(Buffer.from(fallbackPDF));
-      return;
-    }
-
-    console.log("✅ Starting HTML generation");
-
-    // Apply fallback date parsing
-    const fromDate = dateRange?.from ? new Date(dateRange.from) : new Date();
-    const toDate = dateRange?.to ? new Date(dateRange.to) : new Date();
-
-    // Basic HTML to verify rendering
-    const html = `
-      <!DOCTYPE html>
-      <html lang="en">
-        <head>
-          <meta charset="UTF-8" />
-          <title>Test Report</title>
-          <style>
-            body { font-family: Arial; padding: 40px; }
-            h1 { color: #333; }
-          </style>
-        </head>
-        <body>
-          <h1>Health Summary Report</h1>
-          <p>From: ${format(fromDate, "MMMM d, yyyy")}</p>
-          <p>To: ${format(toDate, "MMMM d, yyyy")}</p>
-          <p>Patient: ${healthData.patientName || "N/A"}</p>
-        </body>
-      </html>
-    `;
-
-    console.log("✅ HTML generation done");
+    const htmlContent = generateHTMLReport(
+      healthData,
+      dateRange,
+      sectionVisibility
+    );
+    console.log("✅ HTML generated. Length:", htmlContent.length);
 
     const executablePath = await chrome.executablePath;
     const browser = await puppeteer.launch({
-      args: chrome.args,
+      args: [...chrome.args, "--hide-scrollbars", "--disable-web-security"],
+      defaultViewport: chrome.defaultViewport,
       executablePath: executablePath || undefined,
       headless: true,
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
-    const pdf = await page.pdf({ format: "a4", printBackground: true });
+    const pdfBuffer = await page.pdf({
+      format: "a4",
+      printBackground: true,
+      margin: { top: "20mm", bottom: "20mm", left: "15mm", right: "15mm" },
+      displayHeaderFooter: true,
+      headerTemplate: `
+        <div style="font-size:10px;width:100%;text-align:center;color:#666;">
+          <span>Health Summary Report - ${
+            healthData.patientName || "Patient"
+          }</span>
+        </div>`,
+      footerTemplate: `
+        <div style="font-size:10px;width:100%;text-align:center;color:#666;">
+          Page <span class="pageNumber"></span> of <span class="totalPages"></span> | Generated on ${format(
+            new Date(),
+            "MMMM d, yyyy 'at' h:mm a"
+          )}
+        </div>`,
+    });
+
     await browser.close();
 
+    const filename = `health-summary-${(healthData.patientName || "patient")
+      .replace(/\s+/g, "-")
+      .toLowerCase()}-${format(
+      new Date(dateRange.from),
+      "yyyy-MM-dd"
+    )}-to-${format(new Date(dateRange.to), "yyyy-MM-dd")}.pdf`;
+
+    console.log("📄 PDF generated and named:", filename);
+
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=health-report.pdf"
-    );
-    res.send(Buffer.from(pdf));
-  } catch (err) {
-    console.error("🔥 PDF generation failed:", err);
-    res.status(500).send("PDF generation failed");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length.toString());
+    res.send(Buffer.from(pdfBuffer));
+  } catch (err: any) {
+    console.error("🔥 Error generating PDF:", err.message || err);
+    if (err.stack) console.error("🧯 Stack:", err.stack);
+    res.status(500).send("Failed to generate PDF.");
   }
 });
 
