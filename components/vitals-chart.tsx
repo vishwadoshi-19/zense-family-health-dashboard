@@ -125,12 +125,12 @@ export function VitalsChart({ data }: { data: any[] }) {
   ].filter((tab) => tab.hasData)
 
   return (
-    <Card className="border-teal-100 bg-white/80 backdrop-blur-sm">
+    <Card className="border-teal-100 bg-white/80 backdrop-blur-sm ml-2 md:ml-0">
       <CardHeader className="pb-3">
         <CardTitle className="text-teal-900 flex items-center gap-2">📈<span className="px-0.5"></span>Vitals Trends</CardTitle>
         <CardDescription className="text-teal-600">Track changes in vital signs over time</CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="px-4 md:p-0">
         <Tabs value={activeVital} onValueChange={setActiveVital} className="w-full">
           <div className="px-6 pt-2">
             <ScrollArea className="w-full">
@@ -152,7 +152,7 @@ export function VitalsChart({ data }: { data: any[] }) {
 
           <div className="p-6 pt-4">
             <TabsContent value="bloodPressure" className="mt-0">
-              <div className="h-[250px] md:h-[300px] w-full">
+              <div className="h-[250px] md:h-[300px] w-full mx-auto">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -200,7 +200,7 @@ export function VitalsChart({ data }: { data: any[] }) {
             </TabsContent>
 
             <TabsContent value="temperature" className="mt-0">
-              <div className="h-[250px] md:h-[300px] w-full">
+              <div className="h-[250px] md:h-[300px] w-full mx-auto">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -235,7 +235,7 @@ export function VitalsChart({ data }: { data: any[] }) {
             </TabsContent>
 
             <TabsContent value="heartRate" className="mt-0">
-              <div className="h-[250px] md:h-[300px] w-full">
+              <div className="h-[250px] md:h-[300px] w-full mx-auto">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -270,7 +270,7 @@ export function VitalsChart({ data }: { data: any[] }) {
             </TabsContent>
 
             <TabsContent value="oxygenLevel" className="mt-0">
-              <div className="h-[250px] md:h-[300px] w-full">
+              <div className="h-[250px] md:h-[300px] w-full mx-auto">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -305,7 +305,7 @@ export function VitalsChart({ data }: { data: any[] }) {
             </TabsContent>
 
             <TabsContent value="bloodSugar" className="mt-0">
-              <div className="h-[250px] md:h-[300px] w-full">
+              <div className="h-[250px] md:h-[300px] w-full mx-auto">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

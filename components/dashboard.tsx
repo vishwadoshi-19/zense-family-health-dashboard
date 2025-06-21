@@ -60,6 +60,31 @@ export function Dashboard({ userId }: { userId: string }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
 
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [showHeader, setShowHeader] = useState(true);
+
+  // Handle scroll to hide/show header
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // Scrolling down and scrolled past 100px
+        setShowHeader(false);
+      } else if (currentScrollY < lastScrollY) {
+        // Scrolling up
+        setShowHeader(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [lastScrollY]); // Dependency on lastScrollY to update the state correctly
+
   const [sectionVisibility, setSectionVisibility] =
     useState<SectionVisibilityType>({
       patientInfo: true,
@@ -261,47 +286,16 @@ export function Dashboard({ userId }: { userId: string }) {
     router.push("/");
   };
 
-  const MobileActions = () => (
-    <div className="flex flex-col gap-3 p-4">
-      <Button
-        onClick={handleDownloadPDF}
-        disabled={isGeneratingPDF || isLoading || !healthData}
-        // disabled
-        className="w-full bg-teal-700 hover:bg-teal-800 text-white"
-      >
-        {isGeneratingPDF ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Generating...
-          </>
-        ) : (
-          <>
-            <Download className="h-4 w-4 mr-2" />
-            📄 Download Summary
-          </>
-        )}
-      </Button>
-      <Button
-        variant="outline"
-        onClick={handleLogout}
-        className="w-full border-teal-200 text-teal-700 hover:bg-teal-50"
-      >
-        <LogOut className="h-4 w-4 mr-2" />
-        🚪 Logout
-      </Button>
-    </div>
-  );
-
   return (
-    <div className="my-2 mx-4 min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50">
-      <header className="bg-white/90 backdrop-blur-sm border-b border-teal-100 sticky top-0 z-20">
+    <div className="my-0 mx-0 min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50 md:my-2 md:mx-4">
+      <header className={`bg-white/90 backdrop-blur-sm border-b border-teal-100 sticky top-0 z-20 transition-transform duration-300 ${showHeader ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="container mx-auto py-3 md:py-4 px-4 md:px-6 mobile-safe-area">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0 m-2 mx-6 ">
-              <h1 className="text-3xl md:text-4xl font-bold text-teal-900 truncate">
+          <div className="flex items-center gap-2 md:gap-4"> {/* Adjusted gap for mobile */}
+            <div className="flex-1 min-w-0 pl-2 md:m-2 md:mx-6">
+              <h1 className="text-xl md:text-4xl font-bold text-teal-900 truncate">
                 Health Dashboard
               </h1>
-              <p className="pt-1 text-lg md:text-xl text-teal-600 truncate">
+              <p className="pt-1 text-sm md:text-xl text-teal-600 truncate">
                 {healthData?.patientName ? (
                   <>
                     {healthData.patientName}'s Data
@@ -318,7 +312,6 @@ export function Dashboard({ userId }: { userId: string }) {
               <Button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF || isLoading || !healthData}
-                // disabled
                 className="bg-teal-700 hover:bg-teal-800 text-white"
               >
                 {isGeneratingPDF ? (
@@ -347,9 +340,10 @@ export function Dashboard({ userId }: { userId: string }) {
             <Button
               variant="outline"
               onClick={handleLogout}
-              className="md:hidden text-teal-700 hover:bg-teal-50 px-4 py-2 mr-3 flex items-center gap-2 border-teal-200"
+              className="md:hidden text-teal-700 hover:bg-teal-50 px-3 py-1.5 flex items-center gap-1 border-teal-200 text-sm"
             >
-              <LogOut className="h-5 w-5 font-bold" />
+              <LogOut className="h-4 w-4 font-bold" />
+              Logout
             </Button>
           </div>
         </div>
@@ -359,13 +353,12 @@ export function Dashboard({ userId }: { userId: string }) {
       <Button
         onClick={handleDownloadPDF}
         disabled={isGeneratingPDF || isLoading || !healthData}
-        // disabled
-        className="fixed bottom-6 right-6 md:hidden w-16 h-16 rounded-full bg-teal-700 hover:bg-teal-800 text-white shadow-lg z-50"
+        className="fixed bottom-4 right-4 md:hidden w-12 h-12 rounded-full bg-teal-700 hover:bg-teal-800 text-white shadow-lg z-50 flex items-center justify-center p-0"
       >
         {isGeneratingPDF ? (
-          <Loader2 className="h-20 w-20 text-6xl animate-spin" />
+          <Loader2 className="h-6 w-6 animate-spin" />
         ) : (
-          <Download className="h-20 w-20 text-6xl" />
+          <Download className="h-6 w-6" />
         )}
       </Button>
 
@@ -458,7 +451,7 @@ export function Dashboard({ userId }: { userId: string }) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
                   {/* Start Date Picker */}
                   <div className="flex-1 space-y-2">
                     <Label className="text-teal-700">Start Date</Label>

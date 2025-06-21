@@ -93,7 +93,7 @@ export function   PinEntryForm() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-0"> {/* Added padding for smaller screens */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-3">
           <label htmlFor="pin" className="sr-only">
@@ -140,7 +140,7 @@ export function   PinEntryForm() {
               <span>🎯</span>
               Demo PINs Available
             </h3>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap justify-center gap-2 px-2"> {/* Added horizontal padding */}
               <Badge
                 variant="outline"
                 className="bg-white border-teal-300 text-teal-700 hover:bg-teal-100 cursor-pointer transition-colors"
