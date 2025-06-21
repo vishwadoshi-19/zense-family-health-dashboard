@@ -2,8 +2,10 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export function MoodChart({ data }: { data: any[] }) {
+  const isMobile = useIsMobile();
   // Extract all mood entries
   const allMoods: string[] = []
 
@@ -62,6 +64,25 @@ export function MoodChart({ data }: { data: any[] }) {
     )
   }
 
+  const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, percent, index, mood, count }: any) => {
+    const radius = outerRadius + (isMobile ? 10 : 20); // Adjust distance from pie edge
+    const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+    const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="#000" // Label text color
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        style={{ fontSize: isMobile ? '11px' : '12px' }} // Responsive font size
+      >
+        {`${mood}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -76,11 +97,11 @@ export function MoodChart({ data }: { data: any[] }) {
               cx="50%"
               cy="50%"
               labelLine={false}
-              outerRadius={80}
+              outerRadius={isMobile ? 70 : 80}
               fill="#8884d8"
               dataKey="count"
               nameKey="mood"
-              label={({ mood, percent }) => `${mood}: ${(percent * 100).toFixed(0)}%`}
+              label={renderCustomizedLabel} // Use the custom rendering function
             >
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={getMoodColor(entry.mood)} />

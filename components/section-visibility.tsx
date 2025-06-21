@@ -57,9 +57,9 @@ export function SectionVisibility({ visibility, onChange }: SectionVisibilityPro
   const sections = [
     { key: "patientInfo", label: "Patient Info", icon: "👤" },
     { key: "vitalsChart", label: "Vitals Charts", icon: "📈" },
-    { key: "moodChart", label: "Mood Distribution", icon: "😊" },
+    { key: "moodChart", label: "Mood", icon: "😊" },
     { key: "vitalsAlerts", label: "Vitals Alerts", icon: "⚠️" },
-    { key: "dietSummary", label: "Diet Summary", icon: "🍽️" },
+    { key: "dietSummary", label: "Diet ", icon: "🍽️" },
     { key: "detailedData", label: "Detailed Data", icon: "📊" },
   ]
 
@@ -126,7 +126,7 @@ export function SectionVisibility({ visibility, onChange }: SectionVisibilityPro
                   : "bg-gray-50 border-gray-200"
               }`}
             >
-              <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <div className="flex items-center space-x-3 flex-1 min-w-0 mr-2">
                 <span className="text-md">{section.icon}</span>
                 <Label
                   htmlFor={section.key}
