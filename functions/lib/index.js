@@ -12,6 +12,7 @@ const chrome_aws_lambda_1 = __importDefault(require("chrome-aws-lambda"));
 const cors_1 = __importDefault(require("cors"));
 const date_fns_1 = require("date-fns");
 const generateHTMLReport_1 = __importDefault(require("./generateHTMLReport")); // <- move the large helper here
+const generateStaffHTMLReport_1 = __importDefault(require("./generateStaffHTMLReport"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)({ origin: true }));
 app.use(body_parser_1.default.json({ limit: "10mb" }));
@@ -60,6 +61,49 @@ app.post("/generate", async (req, res) => {
         if (err.stack)
             console.error("🧯 Stack:", err.stack);
         res.status(500).send("Failed to generate PDF.");
+    }
+});
+app.post("/generateStaffPDF", async (req, res) => {
+    try {
+        const { staff, groupedDuties, reviews } = req.body;
+        if (!staff || !groupedDuties) {
+            res.status(400).json({ error: "Missing staff or duties data" });
+            return;
+        }
+        console.log("📩 Received /generateStaffPDF POST");
+        console.log("🧾 staff keys:", staff ? Object.keys(staff) : "N/A");
+        const htmlContent = (0, generateStaffHTMLReport_1.default)(staff, groupedDuties, reviews);
+        console.log("✅ Staff HTML generated. Length:", htmlContent.length);
+        const executablePath = await chrome_aws_lambda_1.default.executablePath;
+        const browser = await puppeteer_core_1.default.launch({
+            args: [...chrome_aws_lambda_1.default.args, "--hide-scrollbars", "--disable-web-security"],
+            defaultViewport: chrome_aws_lambda_1.default.defaultViewport,
+            executablePath: executablePath || undefined,
+            headless: true,
+        });
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        const pdfBuffer = await page.pdf({
+            format: "a4",
+            printBackground: true,
+            margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
+            displayHeaderFooter: false,
+            pageRanges: '1', // Only the first page will be included
+            scale: 1, // Default scale
+        });
+        await browser.close();
+        const filename = `${staff.name || staff.fullName || "Staff"} Resume.pdf`;
+        console.log("📄 Staff PDF generated and named:", filename);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename=\"${filename}\"`);
+        res.setHeader("Content-Length", pdfBuffer.length.toString());
+        res.send(Buffer.from(pdfBuffer));
+    }
+    catch (err) {
+        console.error("🔥 Error generating staff PDF:", err.message || err);
+        if (err.stack)
+            console.error("🧯 Stack:", err.stack);
+        res.status(500).send("Failed to generate staff PDF.");
     }
 });
 exports.api = (0, https_1.onRequest)({

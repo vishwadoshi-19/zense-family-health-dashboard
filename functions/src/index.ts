@@ -7,6 +7,7 @@ import cors from "cors";
 import { format } from "date-fns";
 
 import generateHTMLReport from "./generateHTMLReport"; // <- move the large helper here
+import generateStaffHTMLReport from "./generateStaffHTMLReport";
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -79,6 +80,57 @@ app.post("/generate", async (req: Request, res: Response) => {
     console.error("🔥 Error generating PDF:", err.message || err);
     if (err.stack) console.error("🧯 Stack:", err.stack);
     res.status(500).send("Failed to generate PDF.");
+  }
+});
+
+app.post("/generateStaffPDF", async (req: Request, res: Response) => {
+  try {
+    const { staff, groupedDuties, reviews } = req.body;
+    if (!staff || !groupedDuties) {
+      res.status(400).json({ error: "Missing staff or duties data" });
+      return;
+    }
+
+    console.log("📩 Received /generateStaffPDF POST");
+    console.log("🧾 staff keys:", staff ? Object.keys(staff) : "N/A");
+
+    const htmlContent = generateStaffHTMLReport(staff, groupedDuties, reviews);
+    console.log("✅ Staff HTML generated. Length:", htmlContent.length);
+
+    const executablePath = await chrome.executablePath;
+    const browser = await puppeteer.launch({
+      args: [...chrome.args, "--hide-scrollbars", "--disable-web-security"],
+      defaultViewport: chrome.defaultViewport,
+      executablePath: executablePath || undefined,
+      headless: true,
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+
+    const pdfBuffer = await page.pdf({
+      format: "a4",
+      printBackground: true,
+      margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
+      displayHeaderFooter: false,
+      pageRanges: '1', // Only the first page will be included
+      scale: 1, // Default scale
+    });
+
+    await browser.close();
+
+    const filename = `${staff.name || staff.fullName || "Staff"} Resume.pdf`;
+
+    console.log("📄 Staff PDF generated and named:", filename);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=\"${filename}\"`);
+    res.setHeader("Content-Length", pdfBuffer.length.toString());
+    res.send(Buffer.from(pdfBuffer));
+  } catch (err: any) {
+    console.error("🔥 Error generating staff PDF:", err.message || err);
+    if (err.stack) console.error("🧯 Stack:", err.stack);
+    res.status(500).send("Failed to generate staff PDF.");
   }
 });
 
